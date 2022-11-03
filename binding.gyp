@@ -43,26 +43,6 @@
             'src/win/conpty_console_list.cc'
           ],
         },
-        {
-          'target_name': 'pty',
-          'include_dirs' : [
-            '<!(node -e "require(\'nan\')")',
-            'deps/winpty/src/include',
-          ],
-          # Disabled due to winpty
-          'msvs_disabled_warnings': [ 4506, 4530 ],
-          'dependencies' : [
-            'deps/winpty/src/winpty.gyp:winpty-agent',
-            'deps/winpty/src/winpty.gyp:winpty',
-          ],
-          'sources' : [
-            'src/win/winpty.cc',
-            'src/win/path_util.cc'
-          ],
-          'libraries': [
-            'shlwapi.lib'
-          ],
-        }
       ]
     }, { # OS!="win"
       'targets': [

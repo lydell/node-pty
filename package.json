@@ -17,7 +17,6 @@
     "lib/",
     "scripts/",
     "src/",
-    "deps/",
     "typings/"
   ],
   "homepage": "https://github.com/microsoft/node-pty",

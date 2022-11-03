@@ -9,14 +9,6 @@ interface IConptyNative {
   kill(ptyId: number): void;
 }
 
-interface IWinptyNative {
-  startProcess(file: string, commandLine: string, env: string[], cwd: string, cols: number, rows: number, debug: boolean): IWinptyProcess;
-  resize(processHandle: number, cols: number, rows: number): void;
-  kill(pid: number, innerPidHandle: number): void;
-  getProcessList(pid: number): number[];
-  getExitCode(innerPidHandle: number): number;
-}
-
 interface IUnixNative {
   fork(file: string, args: string[], parsedEnv: string[], cwd: string, cols: number, rows: number, uid: number, gid: number, closeFDs: boolean, useUtf8: boolean, onExitCallback: (code: number, signal: number) => void, helperPath: string): IUnixProcess;
   open(cols: number, rows: number): IUnixOpenProcess;
@@ -29,16 +21,6 @@ interface IConptyProcess {
   fd: number;
   conin: string;
   conout: string;
-}
-
-interface IWinptyProcess {
-  pty: number;
-  fd: number;
-  conin: string;
-  conout: string;
-  pid: number;
-  innerPid: number;
-  innerPidHandle: number;
 }
 
 interface IUnixProcess {
