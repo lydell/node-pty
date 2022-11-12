@@ -17,7 +17,8 @@
  * Includes
  */
 
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -87,7 +88,7 @@
  */
 
 struct pty_baton {
-  Nan::Persistent<v8::Function> cb;
+  Napi::FunctionReference cb;
   int exit_code;
   int signal_code;
   pid_t pid;
@@ -99,10 +100,10 @@ struct pty_baton {
  * Methods
  */
 
-NAN_METHOD(PtyFork);
-NAN_METHOD(PtyOpen);
-NAN_METHOD(PtyResize);
-NAN_METHOD(PtyGetProc);
+Napi::Value PtyFork(const Napi::CallbackInfo& info);
+Napi::Value PtyOpen(const Napi::CallbackInfo& info);
+Napi::Value PtyResize(const Napi::CallbackInfo& info);
+Napi::Value PtyGetProc(const Napi::CallbackInfo& info);
 
 /**
  * Functions
@@ -129,57 +130,57 @@ static void
 pty_after_close(uv_handle_t *);
 
 static void throw_for_errno(const char* message, int _errno) {
-  Nan::ThrowError((
+  Napi::ThrowError((
     message + std::string(strerror(_errno))
   ).c_str());
 }
 
-NAN_METHOD(PtyFork) {
-  Nan::HandleScope scope;
+Napi::Value PtyFork(const Napi::CallbackInfo& info) {
+  Napi::HandleScope scope(env);
 
   if (info.Length() != 12 ||
-      !info[0]->IsString() ||
-      !info[1]->IsArray() ||
-      !info[2]->IsArray() ||
-      !info[3]->IsString() ||
-      !info[4]->IsNumber() ||
-      !info[5]->IsNumber() ||
-      !info[6]->IsNumber() ||
-      !info[7]->IsNumber() ||
-      !info[8]->IsBoolean() ||
-      !info[9]->IsBoolean() ||
-      !info[10]->IsFunction() ||
-      !info[11]->IsString()) {
-    return Nan::ThrowError(
+      !info[0].IsString() ||
+      !info[1].IsArray() ||
+      !info[2].IsArray() ||
+      !info[3].IsString() ||
+      !info[4].IsNumber() ||
+      !info[5].IsNumber() ||
+      !info[6].IsNumber() ||
+      !info[7].IsNumber() ||
+      !info[8].IsBoolean() ||
+      !info[9].IsBoolean() ||
+      !info[10].IsFunction() ||
+      !info[11].IsString()) {
+    return Napi::ThrowError(
         "Usage: pty.fork(file, args, env, cwd, cols, rows, uid, gid, closeFDs, utf8, onexit, helperPath)");
   }
 
   // file
-  Nan::Utf8String file(info[0]);
+  std::string file = info[0].As<Napi::String>();
 
   // env
-  v8::Local<v8::Array> env_ = v8::Local<v8::Array>::Cast(info[2]);
+  Napi::Array env_ = info[2].As<Napi::Array>();
   int envc = env_->Length();
   char **env = new char*[envc+1];
   env[envc] = NULL;
   for (int i = 0; i < envc; i++) {
-    Nan::Utf8String pair(Nan::Get(env_, i).ToLocalChecked());
+    std::string pair = (env_).Get(i.As<Napi::String>());
     env[i] = strdup(*pair);
   }
 
   // cwd
-  Nan::Utf8String cwd_(info[3]);
+  std::string cwd_ = info[3].As<Napi::String>();
 
   // uid / gid
-  int uid = info[6]->IntegerValue(Nan::GetCurrentContext()).FromJust();
-  int gid = info[7]->IntegerValue(Nan::GetCurrentContext()).FromJust();
+  int uid = info[6].IntegerValue(Napi::GetCurrentContext());
+  int gid = info[7].IntegerValue(Napi::GetCurrentContext());
 
   // closeFDs
-  bool closeFDs = Nan::To<bool>(info[8]).FromJust();
+  bool closeFDs = info[8].As<Napi::Boolean>().Value();
   bool explicitlyCloseFDs = closeFDs && !HAVE_POSIX_SPAWN_CLOEXEC_DEFAULT;
 
   // args
-  v8::Local<v8::Array> argv_ = v8::Local<v8::Array>::Cast(info[1]);
+  Napi::Array argv_ = info[1].As<Napi::Array>();
 
   const int EXTRA_ARGS = 5;
   int argc = argv_->Length();
@@ -192,14 +193,14 @@ NAN_METHOD(PtyFork) {
   argv[4] = strdup(*file);
   argv[argl - 1] = NULL;
   for (int i = 0; i < argc; i++) {
-    Nan::Utf8String arg(Nan::Get(argv_, i).ToLocalChecked());
+    std::string arg = (argv_).Get(i.As<Napi::String>());
     argv[i + EXTRA_ARGS] = strdup(*arg);
   }
 
   // size
   struct winsize winp;
-  winp.ws_col = info[4]->IntegerValue(Nan::GetCurrentContext()).FromJust();
-  winp.ws_row = info[5]->IntegerValue(Nan::GetCurrentContext()).FromJust();
+  winp.ws_col = info[4].IntegerValue(Napi::GetCurrentContext());
+  winp.ws_row = info[5].IntegerValue(Napi::GetCurrentContext());
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -207,7 +208,7 @@ NAN_METHOD(PtyFork) {
   struct termios t = termios();
   struct termios *term = &t;
   term->c_iflag = ICRNL | IXON | IXANY | IMAXBEL | BRKINT;
-  if (Nan::To<bool>(info[9]).FromJust()) {
+  if (info[9].As<Napi::Boolean>().Value()) {
 #if defined(IUTF8)
     term->c_iflag |= IUTF8;
 #endif
@@ -242,7 +243,7 @@ NAN_METHOD(PtyFork) {
   cfsetospeed(term, B38400);
 
   // helperPath
-  Nan::Utf8String helper_path_(info[11]);
+  std::string helper_path_ = info[11].As<Napi::String>();
   char *helper_path = strdup(*helper_path_);
 
   sigset_t newmask, oldmask;
@@ -259,14 +260,16 @@ NAN_METHOD(PtyFork) {
   int ret = pty_openpty(&master, &slave, nullptr, term, &winp);
   if (ret == -1) {
     perror("openpty failed");
-    Nan::ThrowError("openpty failed.");
+    Napi::Error::New(env, "openpty failed.").ThrowAsJavaScriptException();
+
     goto done;
   }
 
   int comms_pipe[2];
   if (pipe(comms_pipe)) {
     perror("pipe() failed");
-    Nan::ThrowError("pipe() failed.");
+    Napi::Error::New(env, "pipe() failed.").ThrowAsJavaScriptException();
+
     goto done;
   }
 
@@ -317,25 +320,23 @@ NAN_METHOD(PtyFork) {
     }
 
     if (pty_nonblock(master) == -1) {
-      Nan::ThrowError("Could not set master fd to nonblocking.");
+      Napi::Error::New(env, "Could not set master fd to nonblocking.").ThrowAsJavaScriptException();
+
       goto done;
     }
 
-    v8::Local<v8::Object> obj = Nan::New<v8::Object>();
-    Nan::Set(obj,
-      Nan::New<v8::String>("fd").ToLocalChecked(),
-      Nan::New<v8::Number>(master));
-    Nan::Set(obj,
-      Nan::New<v8::String>("pid").ToLocalChecked(),
-      Nan::New<v8::Number>(pid));
-    Nan::Set(obj,
-      Nan::New<v8::String>("pty").ToLocalChecked(),
-      Nan::New<v8::String>(ptsname(master)).ToLocalChecked());
+    Napi::Object obj = Napi::Object::New(env);
+    (obj).Set(Napi::String::New(env, "fd"),
+      Napi::Number::New(env, master));
+    (obj).Set(Napi::String::New(env, "pid"),
+      Napi::Number::New(env, pid));
+    (obj).Set(Napi::String::New(env, "pty"),
+      Napi::String::New(env, ptsname(master)));
 
     pty_baton *baton = new pty_baton();
     baton->exit_code = 0;
     baton->signal_code = 0;
-    baton->cb.Reset(v8::Local<v8::Function>::Cast(info[10]));
+    baton->cb.Reset(info[10].As<Napi::Function>());
     baton->pid = pid;
     baton->async.data = baton;
 
@@ -343,7 +344,7 @@ NAN_METHOD(PtyFork) {
 
     uv_thread_create(&baton->tid, pty_waitpid, static_cast<void*>(baton));
 
-    info.GetReturnValue().Set(obj);
+    return obj;
   }
 done:
   posix_spawn_file_actions_destroy(&acts);
@@ -360,19 +361,20 @@ done:
   free(helper_path);
 }
 
-NAN_METHOD(PtyOpen) {
-  Nan::HandleScope scope;
+Napi::Value PtyOpen(const Napi::CallbackInfo& info) {
+  Napi::HandleScope scope(env);
 
   if (info.Length() != 2 ||
-      !info[0]->IsNumber() ||
-      !info[1]->IsNumber()) {
-    return Nan::ThrowError("Usage: pty.open(cols, rows)");
+      !info[0].IsNumber() ||
+      !info[1].IsNumber()) {
+    Napi::Error::New(env, "Usage: pty.open(cols, rows)").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   // size
   struct winsize winp;
-  winp.ws_col = info[0]->IntegerValue(Nan::GetCurrentContext()).FromJust();
-  winp.ws_row = info[1]->IntegerValue(Nan::GetCurrentContext()).FromJust();
+  winp.ws_col = info[0].IntegerValue(Napi::GetCurrentContext());
+  winp.ws_row = info[1].IntegerValue(Napi::GetCurrentContext());
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -381,88 +383,95 @@ NAN_METHOD(PtyOpen) {
   int ret = pty_openpty(&master, &slave, nullptr, NULL, &winp);
 
   if (ret == -1) {
-    return Nan::ThrowError("openpty(3) failed.");
+    Napi::Error::New(env, "openpty(3) failed.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   if (pty_nonblock(master) == -1) {
-    return Nan::ThrowError("Could not set master fd to nonblocking.");
+    Napi::Error::New(env, "Could not set master fd to nonblocking.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   if (pty_nonblock(slave) == -1) {
-    return Nan::ThrowError("Could not set slave fd to nonblocking.");
+    Napi::Error::New(env, "Could not set slave fd to nonblocking.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  v8::Local<v8::Object> obj = Nan::New<v8::Object>();
-  Nan::Set(obj,
-    Nan::New<v8::String>("master").ToLocalChecked(),
-    Nan::New<v8::Number>(master));
-  Nan::Set(obj,
-    Nan::New<v8::String>("slave").ToLocalChecked(),
-    Nan::New<v8::Number>(slave));
-  Nan::Set(obj,
-    Nan::New<v8::String>("pty").ToLocalChecked(),
-    Nan::New<v8::String>(ptsname(master)).ToLocalChecked());
+  Napi::Object obj = Napi::Object::New(env);
+  (obj).Set(Napi::String::New(env, "master"),
+    Napi::Number::New(env, master));
+  (obj).Set(Napi::String::New(env, "slave"),
+    Napi::Number::New(env, slave));
+  (obj).Set(Napi::String::New(env, "pty"),
+    Napi::String::New(env, ptsname(master)));
 
-  return info.GetReturnValue().Set(obj);
+  return return obj;
 }
 
-NAN_METHOD(PtyResize) {
-  Nan::HandleScope scope;
+Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+  Napi::HandleScope scope(env);
 
   if (info.Length() != 3 ||
-      !info[0]->IsNumber() ||
-      !info[1]->IsNumber() ||
-      !info[2]->IsNumber()) {
-    return Nan::ThrowError("Usage: pty.resize(fd, cols, rows)");
+      !info[0].IsNumber() ||
+      !info[1].IsNumber() ||
+      !info[2].IsNumber()) {
+    Napi::Error::New(env, "Usage: pty.resize(fd, cols, rows)").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  int fd = info[0]->IntegerValue(Nan::GetCurrentContext()).FromJust();
+  int fd = info[0].IntegerValue(Napi::GetCurrentContext());
 
   struct winsize winp;
-  winp.ws_col = info[1]->IntegerValue(Nan::GetCurrentContext()).FromJust();
-  winp.ws_row = info[2]->IntegerValue(Nan::GetCurrentContext()).FromJust();
+  winp.ws_col = info[1].IntegerValue(Napi::GetCurrentContext());
+  winp.ws_row = info[2].IntegerValue(Napi::GetCurrentContext());
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
   if (ioctl(fd, TIOCSWINSZ, &winp) == -1) {
     switch (errno) {
-      case EBADF: return Nan::ThrowError("ioctl(2) failed, EBADF");
-      case EFAULT: return Nan::ThrowError("ioctl(2) failed, EFAULT");
-      case EINVAL: return Nan::ThrowError("ioctl(2) failed, EINVAL");
-      case ENOTTY: return Nan::ThrowError("ioctl(2) failed, ENOTTY");
+      case EBADF: Napi::Error::New(env, "ioctl(2) failed, EBADF").ThrowAsJavaScriptException();
+ return env.Null();
+      case EFAULT: Napi::Error::New(env, "ioctl(2) failed, EFAULT").ThrowAsJavaScriptException();
+ return env.Null();
+      case EINVAL: Napi::Error::New(env, "ioctl(2) failed, EINVAL").ThrowAsJavaScriptException();
+ return env.Null();
+      case ENOTTY: Napi::Error::New(env, "ioctl(2) failed, ENOTTY").ThrowAsJavaScriptException();
+ return env.Null();
     }
-    return Nan::ThrowError("ioctl(2) failed");
+    Napi::Error::New(env, "ioctl(2) failed").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  return info.GetReturnValue().SetUndefined();
+  return return env.Undefined();
 }
 
 /**
  * Foreground Process Name
  */
-NAN_METHOD(PtyGetProc) {
-  Nan::HandleScope scope;
+Napi::Value PtyGetProc(const Napi::CallbackInfo& info) {
+  Napi::HandleScope scope(env);
 
   if (info.Length() != 2 ||
-      !info[0]->IsNumber() ||
-      !info[1]->IsString()) {
-    return Nan::ThrowError("Usage: pty.process(fd, tty)");
+      !info[0].IsNumber() ||
+      !info[1].IsString()) {
+    Napi::Error::New(env, "Usage: pty.process(fd, tty)").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  int fd = info[0]->IntegerValue(Nan::GetCurrentContext()).FromJust();
+  int fd = info[0].IntegerValue(Napi::GetCurrentContext());
 
-  Nan::Utf8String tty_(info[1]);
+  std::string tty_ = info[1].As<Napi::String>();
   char *tty = strdup(*tty_);
   char *name = pty_getproc(fd, tty);
   free(tty);
 
   if (name == NULL) {
-    return info.GetReturnValue().SetUndefined();
+    return return env.Undefined();
   }
 
-  v8::Local<v8::String> name_ = Nan::New<v8::String>(name).ToLocalChecked();
+  Napi::String name_ = Napi::String::New(env, name);
   free(name);
-  return info.GetReturnValue().Set(name_);
+  return return name_;
 }
 
 /**
@@ -521,19 +530,19 @@ pty_waitpid(void *data) {
 
 static void
 pty_after_waitpid(uv_async_t *async) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
   pty_baton *baton = static_cast<pty_baton*>(async->data);
 
-  v8::Local<v8::Value> argv[] = {
-    Nan::New<v8::Integer>(baton->exit_code),
-    Nan::New<v8::Integer>(baton->signal_code),
+  Napi::Value argv[] = {
+    Napi::Number::New(env, baton->exit_code),
+    Napi::Number::New(env, baton->signal_code),
   };
 
-  v8::Local<v8::Function> cb = Nan::New<v8::Function>(baton->cb);
+  Napi::Function cb = Napi::Function::New(env, baton->cb);
   baton->cb.Reset();
   memset(&baton->cb, -1, sizeof(baton->cb));
-  Nan::AsyncResource resource("pty_after_waitpid");
-  resource.runInAsyncScope(Nan::GetCurrentContext()->Global(), cb, 2, argv);
+  Napi::AsyncResource resource("pty_after_waitpid");
+  resource.runInAsyncScope(Napi::GetCurrentContext()->Global(), cb, 2, argv);
 
   uv_close((uv_handle_t *)async, pty_after_close);
 }
@@ -696,12 +705,12 @@ err:
  * Init
  */
 
-NAN_MODULE_INIT(init) {
-  Nan::HandleScope scope;
-  Nan::Export(target, "fork", PtyFork);
-  Nan::Export(target, "open", PtyOpen);
-  Nan::Export(target, "resize", PtyResize);
-  Nan::Export(target, "process", PtyGetProc);
+Napi::Object init(Napi::Env env, Napi::Object exports) {
+  Napi::HandleScope scope(env);
+  Napi::Export(target, "fork", PtyFork);
+  Napi::Export(target, "open", PtyOpen);
+  Napi::Export(target, "resize", PtyResize);
+  Napi::Export(target, "process", PtyGetProc);
 }
 
-NODE_MODULE(pty, init)
+NODE_API_MODULE(pty, init)

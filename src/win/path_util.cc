@@ -4,14 +4,15 @@
  * Copyright (c) 2018, Microsoft Corporation (MIT License).
  */
 
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <Shlwapi.h> // PathCombine
 
 #include "path_util.h"
 
 namespace path_util {
 
-const wchar_t* to_wstring(const Nan::Utf8String& str) {
+const wchar_t* to_wstring(const std::string& str) {
   const char *bytes = *str;
   unsigned int sizeOfStr = MultiByteToWideChar(CP_UTF8, 0, bytes, -1, NULL, 0);
   wchar_t *output = new wchar_t[sizeOfStr];
@@ -47,7 +48,7 @@ std::wstring get_shell_path(std::wstring filename) {
   std::wstring buffer(buffer_);
   while ((pos = buffer.find(delimiter)) != std::wstring::npos) {
     paths.push_back(buffer.substr(0, pos));
-    buffer.erase(0, pos + delimiter.length());
+    buffer.erase(0, pos + delimiter.Length());
   }
 
   const wchar_t *filename_ = filename.c_str();
