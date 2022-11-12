@@ -136,8 +136,8 @@ static void throw_for_errno(Napi::Env env, const char* message, int _errno) {
 }
 
 Napi::Value PtyFork(const Napi::CallbackInfo& info) {
-  Napi::Env napi_env = info.Env();
-  Napi::HandleScope scope(napi_env);
+  Napi::Env env = info.Env();
+  Napi::HandleScope scope(env);
 
   if (info.Length() != 12 ||
       !info[0].IsString() ||
@@ -152,22 +152,22 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
       !info[9].IsBoolean() ||
       !info[10].IsFunction() ||
       !info[11].IsString()) {
-    Napi::Error::New(napi_env,
+    Napi::Error::New(env,
         "Usage: pty.fork(file, args, env, cwd, cols, rows, uid, gid, closeFDs, utf8, onexit, helperPath)").ThrowAsJavaScriptException();
-    return napi_env.Null();
+    return env.Null();
   }
 
   // file
   std::string file = info[0].As<Napi::String>();
 
-  // env
+  // envp
   Napi::Array env_ = info[2].As<Napi::Array>();
   int envc = env_.Length();
-  char **env = new char*[envc+1];
-  env[envc] = NULL;
+  char **envp = new char*[envc+1];
+  envp[envc] = NULL;
   for (int i = 0; i < envc; i++) {
     std::string pair = (env_).Get(i.As<Napi::String>());
-    env[i] = strdup(*pair);
+    envp[i] = strdup(*pair);
   }
 
   // cwd
@@ -262,7 +262,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   int ret = pty_openpty(&master, &slave, nullptr, term, &winp);
   if (ret == -1) {
     perror("openpty failed");
-    Napi::Error::New(napi_env, "openpty failed.").ThrowAsJavaScriptException();
+    Napi::Error::New(env, "openpty failed.").ThrowAsJavaScriptException();
 
     goto done;
   }
@@ -292,7 +292,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
 
   { // suppresses "jump bypasses variable initialization" errors
     pid_t pid;
-    auto error = posix_spawn(&pid, helper_path, &acts, &attrs, argv, env);
+    auto error = posix_spawn(&pid, helper_path, &acts, &attrs, argv, envp);
 
     close(comms_pipe[1]);
 
@@ -300,7 +300,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
     pthread_sigmask(SIG_SETMASK, &oldmask, NULL);
 
     if (error) {
-      throw_for_errno(napi_env, "posix_spawn failed: ", error);
+      throw_for_errno(env, "posix_spawn failed: ", error);
       goto done;
     }
 
@@ -310,13 +310,13 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
 
     if (bytes_read == sizeof(helper_error)) {
       if (helper_error[0] == COMM_ERR_EXEC) {
-        throw_for_errno(napi_env, "exec() failed: ", helper_error[1]);
+        throw_for_errno(env, "exec() failed: ", helper_error[1]);
       } else if (helper_error[0] == COMM_ERR_CHDIR) {
-        throw_for_errno(napi_env, "chdir() failed: ", helper_error[1]);
+        throw_for_errno(env, "chdir() failed: ", helper_error[1]);
       } else if (helper_error[0] == COMM_ERR_SETUID) {
-        throw_for_errno(napi_env, "setuid() failed: ", helper_error[1]);
+        throw_for_errno(env, "setuid() failed: ", helper_error[1]);
       } else if (helper_error[0] == COMM_ERR_SETGID) {
-        throw_for_errno(napi_env, "setgid() failed: ", helper_error[1]);
+        throw_for_errno(env, "setgid() failed: ", helper_error[1]);
       }
       goto done;
     }
@@ -356,14 +356,15 @@ done:
     for (int i = 0; i < argl; i++) free(argv[i]);
     delete[] argv;
   }
-  if (env) {
-    for (int i = 0; i < envc; i++) free(env[i]);
-    delete[] env;
+  if (envp) {
+    for (int i = 0; i < envc; i++) free(envp[i]);
+    delete[] envp;
   }
   free(helper_path);
 }
 
 Napi::Value PtyOpen(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
   Napi::HandleScope scope(env);
 
   if (info.Length() != 2 ||
@@ -407,10 +408,11 @@ Napi::Value PtyOpen(const Napi::CallbackInfo& info) {
   (obj).Set(Napi::String::New(env, "pty"),
     Napi::String::New(env, ptsname(master)));
 
-  return return obj;
+  return obj;
 }
 
 Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
   Napi::HandleScope scope(env);
 
   if (info.Length() != 3 ||
@@ -444,13 +446,14 @@ Napi::Value PtyResize(const Napi::CallbackInfo& info) {
     return env.Null();
   }
 
-  return return env.Undefined();
+  return env.Undefined();
 }
 
 /**
  * Foreground Process Name
  */
 Napi::Value PtyGetProc(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
   Napi::HandleScope scope(env);
 
   if (info.Length() != 2 ||
@@ -468,12 +471,12 @@ Napi::Value PtyGetProc(const Napi::CallbackInfo& info) {
   free(tty);
 
   if (name == NULL) {
-    return return env.Undefined();
+    return env.Undefined();
   }
 
   Napi::String name_ = Napi::String::New(env, name);
   free(name);
-  return return name_;
+  return name_;
 }
 
 /**
@@ -532,6 +535,7 @@ pty_waitpid(void *data) {
 
 static void
 pty_after_waitpid(uv_async_t *async) {
+  Napi::Env env = info.Env();
   Napi::HandleScope scope(env);
   pty_baton *baton = static_cast<pty_baton*>(async->data);
 
