@@ -88,6 +88,7 @@
  */
 
 struct pty_baton {
+  Napi::Env *env;
   Napi::FunctionReference cb;
   int exit_code;
   int signal_code;
@@ -158,7 +159,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   }
 
   // file
-  std::string file = info[0].As<Napi::String>();
+  std::string file = info[0].As<Napi::String>().Utf8Value();
 
   // envp
   Napi::Array env_ = info[2].As<Napi::Array>();
@@ -166,12 +167,12 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   char **envp = new char*[envc+1];
   envp[envc] = NULL;
   for (int i = 0; i < envc; i++) {
-    std::string pair = (env_).Get(i.As<Napi::String>());
-    envp[i] = strdup(*pair);
+    std::string pair = env_.Get(i).As<Napi::String>().Utf8Value();
+    envp[i] = strdup(pair.c_str());
   }
 
   // cwd
-  std::string cwd_ = info[3].As<Napi::String>();
+  std::string cwd_ = info[3].As<Napi::String>().Utf8Value();
 
   // uid / gid
   int uid = info[6].As<Napi::Number>();
@@ -188,15 +189,15 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   int argc = argv_.Length();
   int argl = argc + EXTRA_ARGS + 1;
   char **argv = new char*[argl];
-  argv[0] = strdup(*cwd_);
+  argv[0] = strdup(cwd_.c_str());
   argv[1] = strdup(std::to_string(uid).c_str());
   argv[2] = strdup(std::to_string(gid).c_str());
   argv[3] = strdup(explicitlyCloseFDs ? "1": "0");
-  argv[4] = strdup(*file);
+  argv[4] = strdup(file.c_str());
   argv[argl - 1] = NULL;
   for (int i = 0; i < argc; i++) {
-    std::string arg = (argv_).Get(i.As<Napi::String>());
-    argv[i + EXTRA_ARGS] = strdup(*arg);
+    std::string arg = argv_.Get(i).As<Napi::String>().Utf8Value();
+    argv[i + EXTRA_ARGS] = strdup(arg.c_str());
   }
 
   // size
@@ -245,8 +246,8 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   cfsetospeed(term, B38400);
 
   // helperPath
-  std::string helper_path_ = info[11].As<Napi::String>();
-  char *helper_path = strdup(*helper_path_);
+  std::string helper_path_ = info[11].As<Napi::String>().Utf8Value();
+  char *helper_path = strdup(helper_path_.c_str());
 
   sigset_t newmask, oldmask;
   int flags = POSIX_SPAWN_USEVFORK;
@@ -336,6 +337,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
       Napi::String::New(env, ptsname(master)));
 
     pty_baton *baton = new pty_baton();
+    baton->env = &env;
     baton->exit_code = 0;
     baton->signal_code = 0;
     baton->cb.Reset(info[10].As<Napi::Function>());
@@ -376,8 +378,8 @@ Napi::Value PtyOpen(const Napi::CallbackInfo& info) {
 
   // size
   struct winsize winp;
-  winp.ws_col = info[0].As<Napi::Number>();
-  winp.ws_row = info[1].As<Napi::Number>();
+  winp.ws_col = info[0].As<Napi::Number>().Uint32Value();
+  winp.ws_row = info[1].As<Napi::Number>().Uint32Value();
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -426,8 +428,8 @@ Napi::Value PtyResize(const Napi::CallbackInfo& info) {
   int fd = info[0].As<Napi::Number>();
 
   struct winsize winp;
-  winp.ws_col = info[1].As<Napi::Number>();
-  winp.ws_row = info[2].As<Napi::Number>();
+  winp.ws_col = info[1].As<Napi::Number>().Uint32Value();
+  winp.ws_row = info[2].As<Napi::Number>().Uint32Value();
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -465,8 +467,8 @@ Napi::Value PtyGetProc(const Napi::CallbackInfo& info) {
 
   int fd = info[0].As<Napi::Number>();
 
-  std::string tty_ = info[1].As<Napi::String>();
-  char *tty = strdup(*tty_);
+  std::string tty_ = info[1].As<Napi::String>().Utf8Value();
+  char *tty = strdup(tty_.c_str());
   char *name = pty_getproc(fd, tty);
   free(tty);
 
@@ -535,9 +537,9 @@ pty_waitpid(void *data) {
 
 static void
 pty_after_waitpid(uv_async_t *async) {
-  Napi::Env env = info.Env();
-  Napi::HandleScope scope(env);
   pty_baton *baton = static_cast<pty_baton*>(async->data);
+  Napi::Env env = *baton->env;
+  Napi::HandleScope scope(env);
 
   Napi::Value argv[] = {
     Napi::Number::New(env, baton->exit_code),
