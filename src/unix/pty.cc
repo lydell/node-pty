@@ -715,10 +715,11 @@ err:
 
 Napi::Object init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
-  Napi::Export(target, "fork", PtyFork);
-  Napi::Export(target, "open", PtyOpen);
-  Napi::Export(target, "resize", PtyResize);
-  Napi::Export(target, "process", PtyGetProc);
+  exports.Set(Napi::String::New(env, "fork"), Napi::Function::New(env, PtyFork));
+  exports.Set(Napi::String::New(env, "open"), Napi::Function::New(env, PtyOpen));
+  exports.Set(Napi::String::New(env, "resize"), Napi::Function::New(env, PtyResize));
+  exports.Set(Napi::String::New(env, "process"), Napi::Function::New(env, PtyGetProc));
+  return exports;
 }
 
 NODE_API_MODULE(pty, init)
