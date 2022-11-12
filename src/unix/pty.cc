@@ -130,9 +130,9 @@ static void
 pty_after_close(uv_handle_t *);
 
 static void throw_for_errno(Napi::Env env, const char* message, int _errno) {
-  throw Napi::Error::New(env, (
+  Napi::Error::New(env, (
     message + std::string(strerror(_errno))
-  ).c_str());
+  ).c_str()).ThrowAsJavaScriptException();
 }
 
 Napi::Value PtyFork(const Napi::CallbackInfo& info) {
@@ -152,8 +152,9 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
       !info[9].IsBoolean() ||
       !info[10].IsFunction() ||
       !info[11].IsString()) {
-    throw Napi::Error::New(napi_env,
-        "Usage: pty.fork(file, args, env, cwd, cols, rows, uid, gid, closeFDs, utf8, onexit, helperPath)");
+    Napi::Error::New(napi_env,
+        "Usage: pty.fork(file, args, env, cwd, cols, rows, uid, gid, closeFDs, utf8, onexit, helperPath)").ThrowAsJavaScriptException();
+    return napi_env.Null();
   }
 
   // file
