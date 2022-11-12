@@ -88,13 +88,17 @@
  */
 
 struct pty_baton {
-  Napi::Env *env;
+  Napi::AsyncContext* context;
   Napi::FunctionReference cb;
   int exit_code;
   int signal_code;
   pid_t pid;
   uv_async_t async;
   uv_thread_t tid;
+
+  pty_baton(Napi::AsyncContext init_context) {
+    this->context = &init_context;
+  }
 };
 
 /**
@@ -336,8 +340,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
     (obj).Set(Napi::String::New(env, "pty"),
       Napi::String::New(env, ptsname(master)));
 
-    pty_baton *baton = new pty_baton();
-    baton->env = &env;
+    pty_baton *baton = new pty_baton(Napi::AsyncContext(env, "pty_after_waitpid"));
     baton->exit_code = 0;
     baton->signal_code = 0;
     baton->cb.Reset(info[10].As<Napi::Function>());
@@ -538,19 +541,21 @@ pty_waitpid(void *data) {
 static void
 pty_after_waitpid(uv_async_t *async) {
   pty_baton *baton = static_cast<pty_baton*>(async->data);
-  Napi::Env env = *baton->env;
+  Napi::AsyncContext *context = baton->context;
+  Napi::Env env = context->Env();
   Napi::HandleScope scope(env);
 
-  Napi::Value argv[] = {
+  const std::initializer_list<napi_value> argv = {
     Napi::Number::New(env, baton->exit_code),
     Napi::Number::New(env, baton->signal_code),
   };
 
-  Napi::Function cb = Napi::Function::New(env, baton->cb);
-  baton->cb.Reset();
-  memset(&baton->cb, -1, sizeof(baton->cb));
-  Napi::AsyncResource resource("pty_after_waitpid");
-  resource.runInAsyncScope(Napi::GetCurrentContext()->Global(), cb, 2, argv);
+  // Napi::Function cb = Napi::Function::New(env, baton->cb);
+  // baton->cb.Reset();
+  // memset(&baton->cb, -1, sizeof(baton->cb));
+  // Napi::AsyncResource resource("pty_after_waitpid");
+  // resource.runInAsyncScope(Napi::GetCurrentContext()->Global(), cb, 2, argv);
+  baton->cb.MakeCallback(Napi::Object::New(env), argv, *context);
 
   uv_close((uv_handle_t *)async, pty_after_close);
 }
