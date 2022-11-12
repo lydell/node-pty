@@ -129,14 +129,15 @@ pty_after_waitpid(uv_async_t *);
 static void
 pty_after_close(uv_handle_t *);
 
-static void throw_for_errno(const char* message, int _errno) {
-  Napi::ThrowError((
+static void throw_for_errno(Napi::Env env, const char* message, int _errno) {
+  throw Napi::Error::New(env, (
     message + std::string(strerror(_errno))
   ).c_str());
 }
 
 Napi::Value PtyFork(const Napi::CallbackInfo& info) {
-  Napi::HandleScope scope(env);
+  Napi::Env napi_env = info.Env();
+  Napi::HandleScope scope(napi_env);
 
   if (info.Length() != 12 ||
       !info[0].IsString() ||
@@ -151,7 +152,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
       !info[9].IsBoolean() ||
       !info[10].IsFunction() ||
       !info[11].IsString()) {
-    return Napi::ThrowError(
+    throw Napi::Error::New(napi_env,
         "Usage: pty.fork(file, args, env, cwd, cols, rows, uid, gid, closeFDs, utf8, onexit, helperPath)");
   }
 
@@ -160,7 +161,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
 
   // env
   Napi::Array env_ = info[2].As<Napi::Array>();
-  int envc = env_->Length();
+  int envc = env_.Length();
   char **env = new char*[envc+1];
   env[envc] = NULL;
   for (int i = 0; i < envc; i++) {
@@ -172,8 +173,8 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   std::string cwd_ = info[3].As<Napi::String>();
 
   // uid / gid
-  int uid = info[6].IntegerValue(Napi::GetCurrentContext());
-  int gid = info[7].IntegerValue(Napi::GetCurrentContext());
+  int uid = info[6].As<Napi::Number>();
+  int gid = info[7].As<Napi::Number>();
 
   // closeFDs
   bool closeFDs = info[8].As<Napi::Boolean>().Value();
@@ -183,7 +184,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   Napi::Array argv_ = info[1].As<Napi::Array>();
 
   const int EXTRA_ARGS = 5;
-  int argc = argv_->Length();
+  int argc = argv_.Length();
   int argl = argc + EXTRA_ARGS + 1;
   char **argv = new char*[argl];
   argv[0] = strdup(*cwd_);
@@ -199,8 +200,8 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
 
   // size
   struct winsize winp;
-  winp.ws_col = info[4].IntegerValue(Napi::GetCurrentContext());
-  winp.ws_row = info[5].IntegerValue(Napi::GetCurrentContext());
+  winp.ws_col = info[4].As<Napi::Number>().Uint32Value();
+  winp.ws_row = info[5].As<Napi::Number>().Uint32Value();
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -260,7 +261,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
   int ret = pty_openpty(&master, &slave, nullptr, term, &winp);
   if (ret == -1) {
     perror("openpty failed");
-    Napi::Error::New(env, "openpty failed.").ThrowAsJavaScriptException();
+    Napi::Error::New(napi_env, "openpty failed.").ThrowAsJavaScriptException();
 
     goto done;
   }
@@ -298,7 +299,7 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
     pthread_sigmask(SIG_SETMASK, &oldmask, NULL);
 
     if (error) {
-      throw_for_errno("posix_spawn failed: ", error);
+      throw_for_errno(napi_env, "posix_spawn failed: ", error);
       goto done;
     }
 
@@ -308,13 +309,13 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
 
     if (bytes_read == sizeof(helper_error)) {
       if (helper_error[0] == COMM_ERR_EXEC) {
-        throw_for_errno("exec() failed: ", helper_error[1]);
+        throw_for_errno(napi_env, "exec() failed: ", helper_error[1]);
       } else if (helper_error[0] == COMM_ERR_CHDIR) {
-        throw_for_errno("chdir() failed: ", helper_error[1]);
+        throw_for_errno(napi_env, "chdir() failed: ", helper_error[1]);
       } else if (helper_error[0] == COMM_ERR_SETUID) {
-        throw_for_errno("setuid() failed: ", helper_error[1]);
+        throw_for_errno(napi_env, "setuid() failed: ", helper_error[1]);
       } else if (helper_error[0] == COMM_ERR_SETGID) {
-        throw_for_errno("setgid() failed: ", helper_error[1]);
+        throw_for_errno(napi_env, "setgid() failed: ", helper_error[1]);
       }
       goto done;
     }
@@ -373,8 +374,8 @@ Napi::Value PtyOpen(const Napi::CallbackInfo& info) {
 
   // size
   struct winsize winp;
-  winp.ws_col = info[0].IntegerValue(Napi::GetCurrentContext());
-  winp.ws_row = info[1].IntegerValue(Napi::GetCurrentContext());
+  winp.ws_col = info[0].As<Napi::Number>();
+  winp.ws_row = info[1].As<Napi::Number>();
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -419,11 +420,11 @@ Napi::Value PtyResize(const Napi::CallbackInfo& info) {
     return env.Null();
   }
 
-  int fd = info[0].IntegerValue(Napi::GetCurrentContext());
+  int fd = info[0].As<Napi::Number>();
 
   struct winsize winp;
-  winp.ws_col = info[1].IntegerValue(Napi::GetCurrentContext());
-  winp.ws_row = info[2].IntegerValue(Napi::GetCurrentContext());
+  winp.ws_col = info[1].As<Napi::Number>();
+  winp.ws_row = info[2].As<Napi::Number>();
   winp.ws_xpixel = 0;
   winp.ws_ypixel = 0;
 
@@ -458,7 +459,7 @@ Napi::Value PtyGetProc(const Napi::CallbackInfo& info) {
     return env.Null();
   }
 
-  int fd = info[0].IntegerValue(Napi::GetCurrentContext());
+  int fd = info[0].As<Napi::Number>();
 
   std::string tty_ = info[1].As<Napi::String>();
   char *tty = strdup(*tty_);
