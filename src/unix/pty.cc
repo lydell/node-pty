@@ -366,6 +366,7 @@ done:
     delete[] envp;
   }
   free(helper_path);
+  return env.Null();
 }
 
 Napi::Value PtyOpen(const Napi::CallbackInfo& info) {
