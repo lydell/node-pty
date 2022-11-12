@@ -333,11 +333,14 @@ Napi::Value PtyFork(const Napi::CallbackInfo& info) {
     }
 
     Napi::Object obj = Napi::Object::New(env);
-    (obj).Set(Napi::String::New(env, "fd"),
+    obj.Set(
+      Napi::String::New(env, "fd"),
       Napi::Number::New(env, master));
-    (obj).Set(Napi::String::New(env, "pid"),
+    obj.Set(
+      Napi::String::New(env, "pid"),
       Napi::Number::New(env, pid));
-    (obj).Set(Napi::String::New(env, "pty"),
+    obj.Set(
+      Napi::String::New(env, "pty"),
       Napi::String::New(env, ptsname(master)));
 
     pty_baton *baton = new pty_baton(Napi::AsyncContext(env, "pty_after_waitpid"));
