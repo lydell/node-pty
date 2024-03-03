@@ -10,6 +10,7 @@ import { Socket } from 'net';
 import { ArgvOrCommandLine } from './types';
 import { fork } from 'child_process';
 import { ConoutConnection } from './windowsConoutConnection';
+import { requireBinary } from './requireBinary';
 
 let conptyNative: IConptyNative;
 
@@ -53,17 +54,7 @@ export class WindowsPtyAgent {
     conptyInheritCursor: boolean = false
   ) {
     if (!conptyNative) {
-      try {
-        conptyNative = require('../build/Release/conpty.node');
-      } catch (outerError) {
-        try {
-          conptyNative = require('../build/Debug/conpty.node');
-        } catch (innerError) {
-          console.error('innerError', innerError);
-          // Re-throw the exception from the Release require if the Debug require fails as well
-          throw outerError;
-        }
-      }
+      conptyNative = requireBinary<IConptyNative>('conpty.node');
     }
     this._ptyNative = conptyNative;
 

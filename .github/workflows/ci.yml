@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - prebuild
+  pull_request:
+
+jobs:
+  main:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        name:
+          - darwin-x64
+          - linux-x64
+          - win32-x64
+        include:
+          - name: darwin-x64
+            os: macOS-latest
+          - name: linux-x64
+            os: ubuntu-latest
+          - name: win32-x64
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: node-pty-${{ matrix.name }}
+          path: node_modules/@lydell/node-pty-${{ matrix.name }}
+          if-no-files-found: error
+      # To download the artifacts for publishing:
+      # rm -rf artifacts && gh run download RUN_ID --dir artifacts

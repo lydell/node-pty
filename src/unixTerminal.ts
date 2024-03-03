@@ -9,24 +9,11 @@ import { Terminal, DEFAULT_COLS, DEFAULT_ROWS } from './terminal';
 import { IProcessEnv, IPtyForkOptions, IPtyOpenOptions } from './interfaces';
 import { ArgvOrCommandLine } from './types';
 import { assign } from './utils';
+import { requireBinary } from './requireBinary';
 
-let pty: IUnixNative;
-let helperPath: string;
-try {
-  pty = require('../build/Release/pty.node');
-  helperPath = '../build/Release/spawn-helper';
-} catch (outerError) {
-  try {
-    pty = require('../build/Debug/pty.node');
-    helperPath = '../build/Debug/spawn-helper';
-  } catch (innerError) {
-    console.error('innerError', innerError);
-    // Re-throw the exception from the Release require if the Debug require fails as well
-    throw outerError;
-  }
-}
-
-helperPath = path.resolve(__dirname, helperPath);
+const pty = requireBinary<IUnixNative>('pty.node');
+let helperPath = `@lydell/node-pty-${process.platform}-${process.arch}/spawn-helper`;
+helperPath = process.platform === 'darwin' ? require.resolve(helperPath) : 'spawn-helper-unused';
 helperPath = helperPath.replace('app.asar', 'app.asar.unpacked');
 helperPath = helperPath.replace('node_modules.asar', 'node_modules.asar.unpacked');
 
