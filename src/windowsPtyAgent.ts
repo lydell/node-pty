@@ -5,7 +5,6 @@
  */
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { Socket } from 'net';
 import { ArgvOrCommandLine } from './types';
@@ -13,7 +12,6 @@ import { fork } from 'child_process';
 import { ConoutConnection } from './windowsConoutConnection';
 
 let conptyNative: IConptyNative;
-let winptyNative: IWinptyNative;
 
 /**
  * The amount of time to wait for additional data after the conpty shell process has exited before
@@ -23,8 +21,7 @@ let winptyNative: IWinptyNative;
 const FLUSH_DATA_INTERVAL = 1000;
 
 /**
- * This agent sits between the WindowsTerminal class and provides a common interface for both conpty
- * and winpty.
+ * This agent sits between the WindowsTerminal class and provides an interface for both conpty.
  */
 export class WindowsPtyAgent {
   private _inSocket: Socket;
@@ -37,7 +34,7 @@ export class WindowsPtyAgent {
 
   private _fd: any;
   private _pty: number;
-  private _ptyNative: IConptyNative | IWinptyNative;
+  private _ptyNative: IConptyNative;
 
   public get inSocket(): Socket { return this._inSocket; }
   public get outSocket(): Socket { return this._outSocket; }
@@ -53,42 +50,22 @@ export class WindowsPtyAgent {
     cols: number,
     rows: number,
     debug: boolean,
-    private _useConpty: boolean | undefined,
     conptyInheritCursor: boolean = false
   ) {
-    if (this._useConpty === undefined || this._useConpty === true) {
-      this._useConpty = this._getWindowsBuildNumber() >= 18309;
-    }
-    if (this._useConpty) {
-      if (!conptyNative) {
+    if (!conptyNative) {
+      try {
+        conptyNative = require('../build/Release/conpty.node');
+      } catch (outerError) {
         try {
-          conptyNative = require('../build/Release/conpty.node');
-        } catch (outerError) {
-          try {
-            conptyNative = require('../build/Debug/conpty.node');
-          } catch (innerError) {
-            console.error('innerError', innerError);
-            // Re-throw the exception from the Release require if the Debug require fails as well
-            throw outerError;
-          }
-        }
-      }
-    } else {
-      if (!winptyNative) {
-        try {
-          winptyNative = require('../build/Release/pty.node');
-        } catch (outerError) {
-          try {
-            winptyNative = require('../build/Debug/pty.node');
-          } catch (innerError) {
-            console.error('innerError', innerError);
-            // Re-throw the exception from the Release require if the Debug require fails as well
-            throw outerError;
-          }
+          conptyNative = require('../build/Debug/conpty.node');
+        } catch (innerError) {
+          console.error('innerError', innerError);
+          // Re-throw the exception from the Release require if the Debug require fails as well
+          throw outerError;
         }
       }
     }
-    this._ptyNative = this._useConpty ? conptyNative : winptyNative;
+    this._ptyNative = conptyNative;
 
     // Sanitize input variable.
     cwd = path.resolve(cwd);
@@ -97,14 +74,7 @@ export class WindowsPtyAgent {
     const commandLine = argsToCommandLine(file, args);
 
     // Open pty session.
-    let term: IConptyProcess | IWinptyProcess;
-    if (this._useConpty) {
-      term = (this._ptyNative as IConptyNative).startProcess(file, cols, rows, debug, this._generatePipeName(), conptyInheritCursor);
-    } else {
-      term = (this._ptyNative as IWinptyNative).startProcess(file, commandLine, env, cwd, cols, rows, debug);
-      this._pid = (term as IWinptyProcess).pid;
-      this._innerPid = (term as IWinptyProcess).innerPid;
-    }
+    const term: IConptyProcess = this._ptyNative.startProcess(file, cols, rows, debug, this._generatePipeName(), conptyInheritCursor);
 
     // Not available on windows.
     this._fd = term.fd;
@@ -133,61 +103,35 @@ export class WindowsPtyAgent {
     });
     this._inSocket.setEncoding('utf8');
 
-    if (this._useConpty) {
-      const connect = (this._ptyNative as IConptyNative).connect(this._pty, commandLine, cwd, env, c => this._$onProcessExit(c));
-      this._innerPid = connect.pid;
-    }
+    const connect = (this._ptyNative as IConptyNative).connect(this._pty, commandLine, cwd, env, c => this._$onProcessExit(c));
+    this._innerPid = connect.pid;
   }
 
   public resize(cols: number, rows: number): void {
-    if (this._useConpty) {
-      if (this._exitCode !== undefined) {
-        throw new Error('Cannot resize a pty that has already exited');
-      }
-      this._ptyNative.resize(this._pty, cols, rows);
-      return;
+    if (this._exitCode !== undefined) {
+      throw new Error('Cannot resize a pty that has already exited');
     }
-    this._ptyNative.resize(this._pid, cols, rows);
+    this._ptyNative.resize(this._pty, cols, rows);
   }
 
   public clear(): void {
-    if (this._useConpty) {
-      (this._ptyNative as IConptyNative).clear(this._pty);
-    }
+    this._ptyNative.clear(this._pty);
   }
 
   public kill(): void {
     this._inSocket.readable = false;
     this._outSocket.readable = false;
     // Tell the agent to kill the pty, this releases handles to the process
-    if (this._useConpty) {
-      this._getConsoleProcessList().then(consoleProcessList => {
-        consoleProcessList.forEach((pid: number) => {
-          try {
-            process.kill(pid);
-          } catch (e) {
-            // Ignore if process cannot be found (kill ESRCH error)
-          }
-        });
-        (this._ptyNative as IConptyNative).kill(this._pty);
-      });
-    } else {
-      // Because pty.kill closes the handle, it will kill most processes by itself.
-      // Process IDs can be reused as soon as all handles to them are
-      // dropped, so we want to immediately kill the entire console process list.
-      // If we do not force kill all processes here, node servers in particular
-      // seem to become detached and remain running (see
-      // Microsoft/vscode#26807).
-      const processList: number[] = (this._ptyNative as IWinptyNative).getProcessList(this._pid);
-      (this._ptyNative as IWinptyNative).kill(this._pid, this._innerPid);
-      processList.forEach(pid => {
+    this._getConsoleProcessList().then(consoleProcessList => {
+      consoleProcessList.forEach((pid: number) => {
         try {
           process.kill(pid);
         } catch (e) {
           // Ignore if process cannot be found (kill ESRCH error)
         }
       });
-    }
+      this._ptyNative.kill(this._pty);
+    });
     this._conoutSocketWorker.dispose();
   }
 
@@ -207,20 +151,7 @@ export class WindowsPtyAgent {
   }
 
   public get exitCode(): number | undefined {
-    if (this._useConpty) {
-      return this._exitCode;
-    }
-    const winptyExitCode = (this._ptyNative as IWinptyNative).getExitCode(this._innerPid);
-    return winptyExitCode === -1 ? undefined : winptyExitCode;
-  }
-
-  private _getWindowsBuildNumber(): number {
-    const osVersion = (/(\d+)\.(\d+)\.(\d+)/g).exec(os.release());
-    let buildNumber: number = 0;
-    if (osVersion && osVersion.length === 4) {
-      buildNumber = parseInt(osVersion[3]);
-    }
-    return buildNumber;
+    return this._exitCode;
   }
 
   private _generatePipeName(): string {
