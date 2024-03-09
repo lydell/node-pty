@@ -3,7 +3,7 @@
  * Copyright (c) 2018, Microsoft Corporation (MIT License).
  */
 
-declare module "node-pty" {
+declare module "@lydell/node-pty" {
   /**
    * Forks a process as a pseudoterminal.
    * @param file The file to launch.
