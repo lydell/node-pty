@@ -3,7 +3,7 @@
  * Copyright (c) 2018, Microsoft Corporation (MIT License).
  */
 
-import { UnixTerminal } from './unixTerminal';
+import type { UnixTerminal } from './unixTerminal';
 import * as assert from 'assert';
 import * as cp from 'child_process';
 import * as path from 'path';
@@ -16,6 +16,8 @@ import { pid } from 'process';
 const FIXTURES_PATH = path.normalize(path.join(__dirname, '..', 'fixtures', 'utf8-character.txt'));
 
 if (process.platform !== 'win32') {
+  const UnixTerminal: typeof import('./unixTerminal').UnixTerminal = require('./unixTerminal').UnixTerminal; // eslint-disable-line @typescript-eslint/naming-convention
+
   describe('UnixTerminal', () => {
     describe('Constructor', () => {
       it('should set a valid pts name', () => {
@@ -320,7 +322,7 @@ if (process.platform !== 'win32') {
                 fs.statSync(`/proc/${sub}/fd/${readFd}`);
                 done('not reachable');
               } catch (error) {
-                assert.notStrictEqual(error.message.indexOf('ENOENT'), -1);
+                assert.notStrictEqual((error as Error).message.indexOf('ENOENT'), -1);
               }
               setTimeout(() => {
                 process.kill(parseInt(sub), 'SIGINT');  // SIGINT to child

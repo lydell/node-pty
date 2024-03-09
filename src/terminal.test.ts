@@ -4,19 +4,16 @@
  */
 
 import * as assert from 'assert';
-import { WindowsTerminal } from './windowsTerminal';
-import { UnixTerminal } from './unixTerminal';
 import { Terminal } from './terminal';
 import { Socket } from 'net';
 
-const terminalConstructor = (process.platform === 'win32') ? WindowsTerminal : UnixTerminal;
 const SHELL = (process.platform === 'win32') ? 'cmd.exe' : '/bin/bash';
 
-let terminalCtor: WindowsTerminal | UnixTerminal;
+let terminalCtor: any;
 if (process.platform === 'win32') {
-  terminalCtor = require('./windowsTerminal');
+  terminalCtor = require('./windowsTerminal').WindowsTerminal;
 } else {
-  terminalCtor = require('./unixTerminal');
+  terminalCtor = require('./unixTerminal').UnixTerminal;
 }
 
 class TestTerminal extends Terminal {
@@ -53,8 +50,8 @@ describe('Terminal', () => {
   describe('constructor', () => {
     it('should do basic type checks', () => {
       assert.throws(
-        () => new (<any>terminalCtor)('a', 'b', { 'name': {} }),
-        'name must be a string (not a object)'
+        () => new terminalCtor('a', 'b', { 'name': {} }),
+        Error('name must be a string (not a object)')
       );
     });
   });
@@ -84,7 +81,7 @@ describe('Terminal', () => {
 
   describe('automatic flow control', () => {
     it('should respect ctor flow control options', () => {
-      const pty = new terminalConstructor(SHELL, [], {handleFlowControl: true, flowControlPause: 'abc', flowControlResume: '123'});
+      const pty = new terminalCtor(SHELL, [], {handleFlowControl: true, flowControlPause: 'abc', flowControlResume: '123'});
       assert.equal(pty.handleFlowControl, true);
       assert.equal((pty as any)._flowControlPause, 'abc');
       assert.equal((pty as any)._flowControlResume, '123');
