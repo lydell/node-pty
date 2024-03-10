@@ -63,6 +63,3 @@ jobs:
           path: node_modules/@lydell/node-pty-${{ matrix.name }}-${{ matrix.arch2 }}
           if-no-files-found: error
         if: ${{ matrix.arch2 != 'none' }}
-
-      # To download the artifacts for publishing:
-      # rm -rf artifacts && gh run download RUN_ID --dir artifacts
