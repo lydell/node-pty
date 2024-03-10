@@ -37,7 +37,6 @@
     "build": "node scripts/build.js && node scripts/build-sub-package.js",
     "watch": "tsc -b -w ./src/tsconfig.json",
     "lint": "eslint -c .eslintrc.js --ext .ts src/",
-    "postinstall": "node scripts/post-install.js",
     "test": "cross-env NODE_ENV=test mocha -R spec --exit lib/*.test.js",
     "posttest": "npm run lint",
     "pretest": "npm run build",

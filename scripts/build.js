@@ -9,24 +9,29 @@ const DIST = path.join(REPO_ROOT, "dist");
 
 const variants = [
   {
-    name: "macOS",
     platform: "darwin",
     arch: "x64",
+    tested: false,
   },
   {
-    name: "macOS ARM",
     platform: "darwin",
     arch: "arm64",
+    tested: true,
   },
   {
-    name: "Linux x86_64",
     platform: "linux",
     arch: "x64",
+    tested: true,
   },
   {
-    name: "Windows",
     platform: "win32",
     arch: "x64",
+    tested: true,
+  },
+  {
+    platform: "win32",
+    arch: "arm64",
+    tested: false,
   }
 ]
 
@@ -73,6 +78,23 @@ fs.cpSync(path.join(REPO_ROOT, "typings", "node-pty.d.ts"), path.join(DIST, "nod
 
 fs.writeFileSync(path.join(DIST, "package.json"), JSON.stringify(packageJson, null, 2));
 
+function osName(platform) {
+  switch (platform) {
+    case "darwin": return "macOS";
+    case "linux": return "Linux";
+    case "win32": return "Windows";
+    default: return platform;
+  }
+}
+
+function archName(arch) {
+  switch (arch) {
+    case "x64": return "x86_64";
+    case "arm64": return "ARM64";
+    default: return arch;
+  }
+}
+
 const readme = fs.readFileSync(path.join(REPO_ROOT, "README.md"), "utf8");
 const newReadme = `
 ${readme.trim()}
@@ -85,6 +107,6 @@ ${readme.trim()}
 
 This package includes prebuilt binaries for the following platforms and architectures:
 
-${variants.map(({ name, platform, arch }) => `- ${name} (${platform}-${arch})`).join("\n")}
+${variants.map(({ platform, arch, tested }) => `- ${osName(platform)} ${archName(arch)} (${platform}-${arch})${tested ? "": " (not tested)"}`).join("\n")}
 `.trim();
 fs.writeFileSync(path.join(DIST, "README.md"), newReadme);
