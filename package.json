@@ -6,6 +6,7 @@
   },
   "version": "1.0.0",
   "forkVersion": "1.0.0-beta.4",
+  "basedOnVersion": "1.1.0-beta12",
   "license": "MIT",
   "main": "./lib/index.js",
   "types": "./typings/node-pty.d.ts",

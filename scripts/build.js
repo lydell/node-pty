@@ -101,7 +101,7 @@ ${readme.trim()}
 
 ## Version
 
-@lydell/node-pty@${originalPackageJson.forkVersion} is based on node-pty@${originalPackageJson.version} (plus maybe a few more unreleased commits).
+@lydell/node-pty@${originalPackageJson.forkVersion} is based on node-pty@${originalPackageJson.basedOnVersion}.
 
 ## Prebuilt binaries
 
