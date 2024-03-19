@@ -101,7 +101,7 @@ ${readme.trim()}
 
 ## Version
 
-@lydell/node-pty@${originalPackageJson.forkVersion} is based on node-pty@${originalPackageJson.basedOnVersion}.
+@lydell/node-pty@${originalPackageJson.forkVersion} is based on node-pty@${originalPackageJson.basedOnVersion} (commit [${originalPackageJson.basedOnCommit}](https://github.com/microsoft/node-pty/commit/${originalPackageJson.basedOnCommit})).
 
 ## Prebuilt binaries
 
