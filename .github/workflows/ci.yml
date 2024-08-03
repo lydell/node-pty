@@ -16,21 +16,28 @@ jobs:
           - darwin
           - linux
           - win32
+        arch:
+          - x64
+          - arm64
         include:
           - name: darwin
-            os: macos-14
+            arch: x64
+            os: macos-13
+          - name: darwin
             arch: arm64
-            arch2: x64
+            os: macos-14
           - name: linux
             os: ubuntu-latest
-            arch: x64
-            # node-gyp --arch=arm64 still produced x64 binaries.
-            # Maybe use https://buildjet.com/for-github-actions/docs/about/pricing#arm?
-            arch2: none
           - name: win32
             os: windows-latest
-            arch: x64
-            arch2: arm64
+        exclude:
+          # node-gyp --arch=arm64 still produced x64 binaries.
+          # Maybe use https://buildjet.com/for-github-actions/docs/about/pricing#arm?
+          - name: linux
+            arch: arm64
+          # We'll build this with x64. There is need for a separate job.
+          - name: win32
+            arch: arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -39,15 +46,15 @@ jobs:
           node-version: 20
           cache: yarn
 
-      # Build main arch and run tests.
+      # Build and run tests.
       - run: yarn install --frozen-lockfile
       - run: yarn test
 
-      # Build secondary arch.
-      - run: npx node-gyp rebuild --arch=${{ matrix.arch2 }}
-        if: ${{ matrix.arch2 != 'none' }}
-      - run: node scripts/build-sub-package.js ${{ matrix.arch2 }}
-        if: ${{ matrix.arch2 != 'none' }}
+      # Build arm64 for Windows.
+      - run: npx node-gyp rebuild --arch=${{ matrix.arch }}
+        if: ${{ matrix.name == 'win32' && matrix.arch != 'arm64' }}
+      - run: node scripts/build-sub-package.js ${{ matrix.arch }}
+        if: ${{ matrix.name == 'win32' && matrix.arch != 'arm64' }}
 
       # Upload artifacts.
       - name: Upload node-pty-${{ matrix.name }}-${{ matrix.arch }}
@@ -56,10 +63,3 @@ jobs:
           name: node-pty-${{ matrix.name }}-${{ matrix.arch }}
           path: node_modules/@lydell/node-pty-${{ matrix.name }}-${{ matrix.arch }}
           if-no-files-found: error
-      - name: Upload node-pty-${{ matrix.name }}-${{ matrix.arch2 }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: node-pty-${{ matrix.name }}-${{ matrix.arch2 }}
-          path: node_modules/@lydell/node-pty-${{ matrix.name }}-${{ matrix.arch2 }}
-          if-no-files-found: error
-        if: ${{ matrix.arch2 != 'none' }}
