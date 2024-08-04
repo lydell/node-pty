@@ -31,8 +31,7 @@ jobs:
           - name: win32
             os: windows-latest
         exclude:
-          # node-gyp --arch=arm64 still produced x64 binaries.
-          # Maybe use https://buildjet.com/for-github-actions/docs/about/pricing#arm?
+          # See https://github.com/lydell/node-pty/issues/3
           - name: linux
             arch: arm64
           # We'll build this with x64. There is no Windows arm64 GitHub Actions runner, but --arch=arm64 seems to produce an arm64 binary.
