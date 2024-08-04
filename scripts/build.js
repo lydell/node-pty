@@ -11,7 +11,7 @@ const variants = [
   {
     platform: "darwin",
     arch: "x64",
-    tested: false,
+    tested: true,
   },
   {
     platform: "darwin",
