@@ -13,6 +13,23 @@ if (runId === undefined) {
   process.exit(1);
 }
 
+console.log(`
+Make sure that:
+
+1. You have updated "forkVersion", "basedOnVersion", and "basedOnCommit" in package.json.
+2. You have pushed that to GitHub.
+3. The GitHub Actions run with the ID ${runId} is for that push, and has finished.
+
+Press any key to continue. (Build, test, download artifacts, and publish.)
+`.trim());
+
+const waitResult = childProcess.spawnSync("node", ["-e", "process.stdin.setRawMode(true); process.stdin.on('data', (data) => process.exit(data.toString() === '\\x03' ? 1 : 0)); process.stdin.resume();"], {
+  stdio: "inherit",
+});
+if (waitResult.status !== 0) {
+  process.exit(waitResult.status);
+}
+
 // Build and test.
 const testResult = childProcess.spawnSync("npm", ["test"], {
   shell: true,
