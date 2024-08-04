@@ -34,7 +34,8 @@ jobs:
           # See https://github.com/lydell/node-pty/issues/3
           - name: linux
             arch: arm64
-          # We'll build this with x64. There is no Windows arm64 GitHub Actions runner, but --arch=arm64 seems to produce an arm64 binary.
+          # We'll build this with x64. There is no Windows arm64 GitHub Actions runner,
+          # but --arch=arm64 seems to produce an arm64 binary.
           - name: win32
             arch: arm64
 
@@ -50,10 +51,10 @@ jobs:
       - run: yarn test
 
       # Build arm64 for Windows.
-      - run: npx node-gyp rebuild --arch=${{ matrix.arch }}
-        if: ${{ matrix.name == 'win32' && matrix.arch != 'arm64' }}
-      - run: node scripts/build-sub-package.js ${{ matrix.arch }}
-        if: ${{ matrix.name == 'win32' && matrix.arch != 'arm64' }}
+      - run: npx node-gyp rebuild --arch=arm64
+        if: ${{ matrix.name == 'win32' }}
+      - run: node scripts/build-sub-package.js arm64
+        if: ${{ matrix.name == 'win32' }}
 
       # Upload artifacts.
       - name: Upload node-pty-${{ matrix.name }}-${{ matrix.arch }}
@@ -62,3 +63,12 @@ jobs:
           name: node-pty-${{ matrix.name }}-${{ matrix.arch }}
           path: node_modules/@lydell/node-pty-${{ matrix.name }}-${{ matrix.arch }}
           if-no-files-found: error
+
+      # Upload arm64 for Windows.
+      - name: Upload node-pty-${{ matrix.name }}-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-pty-${{ matrix.name }}-arm64
+          path: node_modules/@lydell/node-pty-${{ matrix.name }}-arm64
+          if-no-files-found: error
+        if: ${{ matrix.name == 'win32' }}
