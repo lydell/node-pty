@@ -35,7 +35,7 @@ jobs:
           # Maybe use https://buildjet.com/for-github-actions/docs/about/pricing#arm?
           - name: linux
             arch: arm64
-          # We'll build this with x64. There is need for a separate job.
+          # We'll build this with x64. There is no Windows arm64 GitHub Actions runner, but --arch=arm64 seems to produce an arm64 binary.
           - name: win32
             arch: arm64
 
