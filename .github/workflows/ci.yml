@@ -27,7 +27,7 @@ jobs:
             arch: arm64
             os: macos-14
           - name: linux
-            os: ubuntu-latest
+            os: ubuntu-20.04
           - name: win32
             os: windows-latest
         exclude:
