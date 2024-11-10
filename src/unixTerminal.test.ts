@@ -283,6 +283,7 @@ if (process.platform !== 'win32') {
           let sub = '';
           let pid = '';
           p.stdout.on('data', (data) => {
+            if (sub) return;
             if (!data.toString().indexOf('title')) {
               sub = data.toString().split(' ')[1].slice(0, -1);
               setTimeout(() => {
