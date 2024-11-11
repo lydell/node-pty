@@ -5,9 +5,9 @@
     "name": "Microsoft Corporation"
   },
   "version": "1.0.0",
-  "forkVersion": "1.0.2",
-  "basedOnVersion": "1.1.0-beta13",
-  "basedOnCommit": "391347926a45bb0b9e2c9a9f837adc56592b3c4b",
+  "forkVersion": "1.0.3",
+  "basedOnVersion": "1.1.0-beta14",
+  "basedOnCommit": "efbf8ebbe7b09351548fa0a4ed07b36c5d2e539b",
   "license": "MIT",
   "main": "./lib/index.js",
   "types": "./typings/node-pty.d.ts",
