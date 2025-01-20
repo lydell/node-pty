@@ -24,6 +24,11 @@ const variants = [
     tested: true,
   },
   {
+    platform: "linux",
+    arch: "arm64",
+    tested: false,
+  },
+  {
     platform: "win32",
     arch: "x64",
     tested: true,

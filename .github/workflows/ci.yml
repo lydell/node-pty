@@ -27,13 +27,14 @@ jobs:
             arch: arm64
             os: macos-14
           - name: linux
+            arch: x64
             os: ubuntu-20.04
+          - name: linux
+            arch: arm64
+            os: ubuntu-22.04-arm
           - name: win32
             os: windows-latest
         exclude:
-          # See https://github.com/lydell/node-pty/issues/3
-          - name: linux
-            arch: arm64
           # We'll build this with x64. There is no Windows arm64 GitHub Actions runner,
           # but --arch=arm64 seems to produce an arm64 binary.
           - name: win32
