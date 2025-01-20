@@ -5,7 +5,7 @@
     "name": "Microsoft Corporation"
   },
   "version": "1.0.0",
-  "forkVersion": "1.0.3",
+  "forkVersion": "1.1.0",
   "basedOnVersion": "1.1.0-beta14",
   "basedOnCommit": "efbf8ebbe7b09351548fa0a4ed07b36c5d2e539b",
   "license": "MIT",
