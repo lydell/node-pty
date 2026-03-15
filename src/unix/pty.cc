@@ -290,6 +290,7 @@ NAN_METHOD(PtyFork) {
     auto error = posix_spawn(&pid, helper_path, &acts, &attrs, argv, env);
 
     close(comms_pipe[1]);
+    close(slave);
 
     // reenable signals
     pthread_sigmask(SIG_SETMASK, &oldmask, NULL);
