@@ -32,7 +32,12 @@ function buildTopPackage() {
     version: VERSION,
     license: "MIT",
     type: "commonjs",
-    exports: "./index.js",
+    exports: {
+      ".": {
+        types: "./node-pty.d.ts",
+        default: "./index.js",
+      },
+    },
     types: "./node-pty.d.ts",
     repository: {
       type: "git",
